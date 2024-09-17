@@ -35,7 +35,6 @@ import PyPDF2
 # Variable que actúa a modo de switch para activar o no el modo RAG
 RAG = False 
 
-
 # Función que se ejecuta al principio de abrir el chat
 
 @cl.on_chat_start
@@ -70,7 +69,7 @@ async def on_chat_start():
                 Select(
                     id="Model",
                     label="LLM - Modelo",
-                    values=["llama3","llama3:70b","gemma2","phi3"],
+                    values=["llama3","llama3:70b","gemma2","phi3:medium"],
                     initial_index=0,
                     )
                 ]
@@ -101,7 +100,7 @@ async def on_chat_start():
         file = files[0]
 
         # Inicio del temporizador
-        start_time = time.time()
+        start_time_rag = time.time()
 
         # Configura las imágenes que se visualizan en el chat mientras espera o cuando está listo
         elements1 = [
@@ -152,7 +151,7 @@ async def on_chat_start():
             return_messages=True,
         )
 
-        # Crea el chat con el modelo seleccionado, el documento para hacer RAG y el buffer de memroia
+        # Crea el chat con el modelo seleccionado, el documento para hacer RAG y el buffer de memoria
         chain = ConversationalRetrievalChain.from_llm(
             ChatOllama(
                 model=selected_model, # selección de modelo
@@ -166,14 +165,14 @@ async def on_chat_start():
         )
 
         # Fin del temporizador
-        end_time = time.time()
+        end_time_rag = time.time()
 
         # Calcular el tiempo transcurrido
-        elapsed_time = end_time - start_time
+        elapsed_time_rag = end_time_rag - start_time_rag
 
     
         # Informa al usuario de que el sistema está listo
-        msg.content = f"Procesado `{file.name}` realizado en `{elapsed_time:.2f}` segundos. Ahora, por favor selecciona un MODELO en las opciones de abajo y realiza tus cuestiones! Nota: El modelo por defecto es LLAMA3."
+        msg.content = f"Procesado `{file.name}` realizado en `{elapsed_time_rag:.2f}` segundos. Ahora, por favor selecciona un MODELO en las opciones de abajo y realiza tus cuestiones! Nota: El modelo por defecto es LLAMA3."
         msg.elements = elements2
         await msg.update()
 
@@ -182,7 +181,7 @@ async def on_chat_start():
         
     else:            
     
-    # Codigo que se ejecuta si el modo RAG está desactivado
+    # Codigo que se ejecuta si el modo RAG está desactivado    
 
         # Selección de modelo LLM
         model = Ollama(model=selected_model,
@@ -213,7 +212,7 @@ async def main(message: cl.Message):
 
     global RAG
 
-    # Codigo que se ejecuta si el modo RAG está activado
+    # Código que se ejecuta si el modo RAG está activado
 
     if RAG:
 
@@ -223,6 +222,8 @@ async def main(message: cl.Message):
         # Inicializa el controlador de devolución de llamada
         cb = cl.LangchainCallbackHandler()
         
+         # Inicio del temporizador
+        start_time_chat = time.time()
 
         # Llama al chat con el contenido del mensaje del usuario, añadiendo que responda en español
         res = await chain.ainvoke(message.content+". Responde en español, incluso si no encuentras respuesta.", callbacks=[cb])    
@@ -231,7 +232,7 @@ async def main(message: cl.Message):
 
         text_elements = []  # Variable para almacenar el texto de las Fuentes del documento
 
-        # Procado del documento para referenciar las fuentes
+        # Procesado del documento para referenciar las fuentes
         if source_documents:
             for source_idx, source_doc in enumerate(source_documents):
                 source_name = f"fuente_{source_idx+1}"
@@ -247,12 +248,26 @@ async def main(message: cl.Message):
             else:
                 answer += "\nNo se ha encontrado fuentes"
         
+
+        # Fin del temporizador
+        end_time_chat = time.time()
+
+        # Calcular el tiempo transcurrido
+        elapsed_time_chat = end_time_chat - start_time_chat
+        answer += f"\n Tiempo en respospender `{elapsed_time_chat:.2f}` segundos"
+
+                
         # Devuelve los resultados
         await cl.Message(content=answer, elements=text_elements).send()
+
+        
     
     else:
 
         # Codigo que se ejecuta si el modo RAG está desactivado
+
+        # Inicio del temporizador
+        start_time_chat = time.time()
 
         # Recupera el chat de la sesión de usuario
         runnable = cl.user_session.get("runnable") 
@@ -267,5 +282,13 @@ async def main(message: cl.Message):
         ):
             await msg.stream_token(chunk)
         
+        # Fin del temporizador
+        end_time_chat = time.time()
+
+        # Calcular el tiempo transcurrido
+        elapsed_time_chat = end_time_chat - start_time_chat
+        msg.content += f"\nTiempo en responder: `{elapsed_time_chat:.2f}` segundos"
+        
         # Devuelve los resultados
         await msg.send()
+        
